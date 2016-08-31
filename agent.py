@@ -11,19 +11,21 @@ class LearningAgent(Agent):
         super(LearningAgent, self).__init__(env)  # sets self.env = env, state = None, next_waypoint = None, and a default color
         self.color = 'red'  # override color
         self.planner = RoutePlanner(self.env, self)  # simple route planner to get next_waypoint
-        self.q = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
-        self.alpha = 1.
-        self.epsilon = 1.
-        self.gamma = 0.5
+        self.q = [];
+        self.alpha = 0.9
+        self.epsilon = 0.75
+        self.gamma = 0.75
         self.sr = 0
         self.random_state = np.random.RandomState(1999)
+        self.states = []
 
     def reset(self, destination=None):
         self.planner.route_to(destination)
-        self.q = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
-        self.alpha = 1.
-        self.epsilon = 1.
-        self.gamma = 0.5
+        self.q = [];
+        self.alpha = 0.9
+        self.epsilon = 0.75
+        self.gamma = 0.75
+        self.states = []
 
     def update(self, t):
         # Gather inputs
@@ -33,45 +35,54 @@ class LearningAgent(Agent):
 
 
         # Select current state
-        states = ['green','restricted-green','red','expanded-red']
-        state = -1
+        current_state = {'light' : inputs['light'], 'left' : inputs['left'], 'oncoming' : inputs['oncoming'], 'next' : self.next_waypoint}
 
-        if inputs['light'] == 'red':
-            if inputs['left'] == None:
-                state = 3
-            else:
-                state = 2
-        elif inputs['light'] == 'green':
-            if inputs['oncoming'] == None or inputs['oncoming'] == 'left':
-                state = 0
-            else:
-                state = 1
+        # if current state is not registered yet add it
+        if current_state not in self.states:
+            self.states.append(current_state)
+            self.q.append([0,0,0,0])
 
-        self.state = states[state]
+        # get the index of the current state
+        current_state_index = self.states.index(current_state)
+
+        self.state = current_state
 
         ## Select action according to your policy
         # reset action value
         action = 0
         # Decay Epsilon
-        self.epsilon = self.epsilon*0.75
+        self.epsilon = self.epsilon*0.25
         # Explore vs. Learn based on Epsilon value
         rn = self.random_state.rand()
         if rn < self.epsilon:
             action = random.randint(0,3)
         else:
-            if np.sum(self.q[state]) > 0:
-                action = self.q[state].index(max(self.q[state]))
+            if np.sum(self.q[current_state_index]) > 0:
+                action = self.q[current_state_index].index(max(self.q[current_state_index]))
             else:
                 action = random.randint(0,3)
 
         ## Execute action and get reward
         reward = self.env.act(self, self.env.valid_actions[action])
 
+        inputs = self.env.sense(self)
+
+        # Select current state
+        new_state = {'light' : inputs['light'], 'left' : inputs['left'], 'oncoming' : inputs['oncoming'], 'next' : self.next_waypoint}
+
+        # if new state is not registered yet add it
+        if new_state not in self.states:
+            self.states.append(new_state)
+            self.q.append([0,0,0,0])
+
+        # get the index of the new state
+        new_state_index = self.states.index(new_state)
+
         ## Learn policy based on state, action, reward
         # Decay alpha
         self.alpha = self.alpha*0.4
         # Update Q
-        update_q(self,state,action,reward,self.gamma,self.alpha)
+        update_q(self,current_state_index,new_state_index,action,reward,self.gamma,self.alpha)
 
         ## Success Rate
         if self.env.agent_states[self]['destination'] == self.env.agent_states[self]['location']:
@@ -80,10 +91,9 @@ class LearningAgent(Agent):
         print "LearningAgent.update(): deadline = {}, inputs = {}, action = {}, reward = {}, state = {}".format(deadline, inputs, action, reward, self.state)  # [debug]
 
 ## Implementation of Q-Learning algorithm
-def update_q(self,state, action, reward, alpha, gamma):
-    new_q = alpha * (reward + gamma * max(get_all_states_values(self.q,state,action)))
-    self.q[state][action] = new_q
-    return self.q[state][action]
+def update_q(self,current_state,new_state,action,reward,alpha, gamma):
+    self.q[current_state][action] = self.q[current_state][action] + alpha * (reward + gamma * max(self.q[new_state]) - self.q[current_state][action])
+    return self.q[current_state][action]
 
 ## Get values of all possible actions
 def get_all_states_values(g,state,action):
