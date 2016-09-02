@@ -12,20 +12,15 @@ class LearningAgent(Agent):
         self.color = 'red'  # override color
         self.planner = RoutePlanner(self.env, self)  # simple route planner to get next_waypoint
         self.q = [];
-        self.alpha = 0.9
-        self.epsilon = 0.75
-        self.gamma = 0.75
+        self.alpha = 0.90
+        self.epsilon = 0.10
+        self.gamma = 0.90
         self.sr = 0
         self.random_state = np.random.RandomState(1999)
         self.states = []
 
     def reset(self, destination=None):
         self.planner.route_to(destination)
-        self.q = [];
-        self.alpha = 0.9
-        self.epsilon = 0.75
-        self.gamma = 0.75
-        self.states = []
 
     def update(self, t):
         # Gather inputs
@@ -79,10 +74,8 @@ class LearningAgent(Agent):
         new_state_index = self.states.index(new_state)
 
         ## Learn policy based on state, action, reward
-        # Decay alpha
-        self.alpha = self.alpha*0.4
         # Update Q
-        update_q(self,current_state_index,new_state_index,action,reward,self.gamma,self.alpha)
+        update_q(self,current_state_index,new_state_index,action,reward,self.alpha,self.gamma)
 
         ## Success Rate
         if self.env.agent_states[self]['destination'] == self.env.agent_states[self]['location']:
